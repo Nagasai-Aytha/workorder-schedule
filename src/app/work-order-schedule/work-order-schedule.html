@@ -1,0 +1,155 @@
+<div class="work-order-timeline">
+  <header class="timeline-header">
+    <div class="brand">NAOLOGIC</div>
+    <h1 class="title">Work Orders</h1>
+  </header>
+
+  <div class="timescale-controls">
+    <label class="timescale-label" for="timescale-select">Timescale</label>
+    <select
+      id="timescale-select"
+      class="timescale-select"
+      [ngModel]="timescaleMode"
+      (ngModelChange)="changeTimescale($event)"
+    >
+      <option value="day">Day</option>
+      <option value="week">Week</option>
+      <option value="month">Month</option>
+    </select>
+  </div>
+
+  <div class="timeline-container">
+    <aside class="work-centers-sidebar">
+      <div class="sidebar-header">Work Center</div>
+      <div class="work-center-row" *ngFor="let center of workCenters; trackBy: trackById">
+        <span class="center-name">{{ center.data.name }}</span>
+      </div>
+    </aside>
+
+    <section class="timeline-grid-wrapper" #timelineScroller>
+      <div class="timeline-scroll" [style.width.px]="totalTimelineWidthPx">
+        <div class="timeline-header-row">
+          <div
+            class="time-segment"
+            [class.current-segment]="segment.isCurrent"
+            *ngFor="let segment of headerSegments"
+            [style.width.px]="segment.width"
+          >
+            {{ segment.label }}
+            <span class="current-month-tag" *ngIf="segment.isCurrent">Current month</span>
+          </div>
+        </div>
+
+        <div class="timeline-grid" #timelineGrid>
+          <div class="current-day-indicator" [style.left.px]="currentDayOffsetPx"></div>
+
+          <div class="day-columns">
+            <div class="day-column" *ngFor="let day of timelineDays"></div>
+          </div>
+
+          <div class="work-order-rows">
+            <div
+              class="work-order-row"
+              *ngFor="let center of workCenters; trackBy: trackById"
+              (click)="onTimelineClick(center.docId, $event)"
+            >
+              <div
+                class="work-order-bar"
+                *ngFor="let order of getWorkOrdersForCenter(center.docId); trackBy: trackById"
+                [style.left]="calculatePosition(order).left"
+                [style.width]="calculatePosition(order).width"
+                [ngClass]="getStatusClass(order.data.status)"
+                (click)="$event.stopPropagation()"
+              >
+                <div class="bar-content">
+                  <span class="order-name">{{ order.data.name }}</span>
+                  <span class="status-badge" [ngClass]="getStatusClass(order.data.status)">
+                    {{ getStatusLabel(order.data.status) }}
+                  </span>
+                </div>
+
+                <div class="three-dot-menu">
+                  <button class="menu-trigger" (click)="toggleOrderMenu(order.docId, $event)" aria-label="Actions">
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                  </button>
+                  <div class="menu-dropdown" *ngIf="isMenuOpen(order.docId)">
+                    <button type="button" (click)="openEditPanel(order, $event)">Edit</button>
+                    <button type="button" class="delete-btn" (click)="deleteWorkOrder(order, $event)">Delete</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="panel-overlay" *ngIf="isPanelOpen" (click)="closePanel()"></div>
+
+<aside class="slide-panel" [class.open]="isPanelOpen">
+  <div class="panel-header">
+    <h2>Work Order Details</h2>
+    <button type="button" class="close-btn" (click)="closePanel()">&times;</button>
+  </div>
+
+  <form [formGroup]="workOrderForm" (ngSubmit)="onSubmit()" class="panel-form">
+    <div class="form-group">
+      <label for="order-name">Work Order Name *</label>
+      <input id="order-name" type="text" class="form-control" formControlName="name" />
+      <div class="error-message" *ngIf="workOrderForm.controls.name.touched && workOrderForm.controls.name.invalid">
+        Work order name is required.
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="order-status">Status *</label>
+      <ng-select
+        id="order-status"
+        formControlName="status"
+        [items]="statusOptions"
+        bindLabel="label"
+        bindValue="value"
+        [clearable]="false"
+        [searchable]="false"
+      ></ng-select>
+    </div>
+
+    <div class="form-group">
+      <label for="start-date">Start Date *</label>
+      <div class="date-input-wrap">
+        <input id="start-date" class="form-control" ngbDatepicker #startDp="ngbDatepicker" formControlName="startDate" />
+        <button type="button" class="date-toggle-btn" aria-label="Toggle start date calendar" (click)="startDp.toggle()"></button>
+      </div>
+      <div
+        class="error-message"
+        *ngIf="workOrderForm.controls.startDate.touched && workOrderForm.controls.startDate.invalid"
+      >
+        Start date is required.
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="end-date">End Date *</label>
+      <div class="date-input-wrap">
+        <input id="end-date" class="form-control" ngbDatepicker #endDp="ngbDatepicker" formControlName="endDate" />
+        <button type="button" class="date-toggle-btn" aria-label="Toggle end date calendar" (click)="endDp.toggle()"></button>
+      </div>
+      <div class="error-message" *ngIf="workOrderForm.controls.endDate.touched && workOrderForm.controls.endDate.invalid">
+        End date is required.
+      </div>
+    </div>
+
+    <div class="error-message overlap-error" *ngIf="overlapError">{{ overlapError }}</div>
+
+    <div class="form-actions">
+      <button type="button" class="btn btn-cancel" (click)="closePanel()">Cancel</button>
+      <button type="submit" class="btn btn-primary">
+        {{ panelMode === 'create' ? 'Create' : 'Save' }}
+      </button>
+    </div>
+  </form>
+</aside>

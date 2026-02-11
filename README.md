@@ -1,59 +1,87 @@
-# WorkorderSchedule
+# Work Order Schedule Timeline
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.1.3.
+Angular standalone implementation of a manufacturing ERP work-order scheduler with:
+- Timeline grid with Day / Week / Month zoom
+- Work-order bars with status badges and actions menu
+- Create/Edit slide panel using Reactive Forms
+- Overlap detection per work center
+- Current-day indicator and horizontal timeline scrolling
 
-## Development server
+## Tech Stack
 
-To start a local development server, run:
+- Angular `21` (works for Angular `17+` requirement)
+- TypeScript strict mode
+- SCSS
+- Reactive Forms
+- `@ng-select/ng-select` for status dropdown
+- `@ng-bootstrap/ng-bootstrap` for datepicker
+- `bootstrap` CSS (base styles for ng-bootstrap components)
+
+## Setup
 
 ```bash
+npm install
 ng serve
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+Open: `http://localhost:4200`
 
-## Code scaffolding
+## Implemented Requirements
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+1. Timeline grid:
+- Fixed work-center column + horizontally scrollable timeline
+- Current-day vertical indicator
+- Day/Week/Month header rendering
+- Row hover highlight
 
-```bash
-ng generate component component-name
-```
+2. Work-order bars:
+- Positioning from `startDate` and `endDate`
+- Status chip (Open / In Progress / Complete / Blocked)
+- Three-dot menu with Edit/Delete
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+3. Create/Edit panel:
+- Slide-out panel
+- Reactive form validation
+- `ng-select` status picker
+- `ngbDatepicker` start/end date fields
+- Create and Save flows in one form
 
-```bash
-ng generate --help
-```
+4. Validation:
+- Required fields
+- End date must be after start date
+- Overlap detection on same work center (excluding currently edited order)
 
-## Building
+5. Data:
+- 5 work centers
+- 8 sample work orders
+- All 4 statuses represented
 
-To build the project run:
+## Bonus Implemented
 
-```bash
-ng build
-```
+- localStorage persistence for work orders
+- Escape key closes panel
+- Basic animation for panel and UI hover transitions
+- `trackBy` optimization for row and bar loops
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+## Project Structure
 
-## Running unit tests
+- Main component:
+  - `src/app/work-order-schedule/work-order-schedule.ts`
+  - `src/app/work-order-schedule/work-order-schedule.html`
+  - `src/app/work-order-schedule/work-order-schedule.scss`
+- Decision logs:
+  - `docs/ai-prompts.md`
+  - `docs/trade-offs.md`
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+## Notes
 
-```bash
-ng test
-```
+- Date positioning is based on a visible date window per zoom level:
+  - Day: `-14` to `+14` days around today
+  - Week: `-60` to `+60` days
+  - Month: `-180` to `+180` days
+- Timescale changes recalculate width and header segments.
 
-## Running end-to-end tests
+## Demo Video and Repository
 
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+- Loom video: 
+- Public repository: 
