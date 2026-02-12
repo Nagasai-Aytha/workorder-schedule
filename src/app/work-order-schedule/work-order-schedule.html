@@ -4,18 +4,33 @@
     <h1 class="title">Work Orders</h1>
   </header>
 
-  <div class="timescale-controls">
-    <label class="timescale-label" for="timescale-select">Timescale</label>
-    <select
-      id="timescale-select"
-      class="timescale-select"
-      [ngModel]="timescaleMode"
-      (ngModelChange)="changeTimescale($event)"
-    >
-      <option value="day">Day</option>
-      <option value="week">Week</option>
-      <option value="month">Month</option>
-    </select>
+  <div class="timescale-controls" [class.open]="isTimescaleOpen" (click)="$event.stopPropagation()">
+    <div class="timescale-pill">
+      <span class="timescale-static">Timescale</span>
+      <button
+        type="button"
+        class="timescale-trigger"
+        (click)="toggleTimescaleMenu($event)"
+        [attr.aria-expanded]="isTimescaleOpen"
+        aria-haspopup="listbox"
+        aria-label="Select timescale"
+      >
+        <span>{{ getTimescaleLabel(timescaleMode) }}</span>
+        <span class="timescale-chevron" aria-hidden="true"></span>
+      </button>
+    </div>
+
+    <div class="timescale-menu" *ngIf="isTimescaleOpen" role="listbox" aria-label="Timescale options">
+      <button
+        type="button"
+        class="timescale-option"
+        *ngFor="let option of timescaleOptions"
+        [class.active]="option.value === timescaleMode"
+        (click)="selectTimescale(option.value, $event)"
+      >
+        {{ option.label }}
+      </button>
+    </div>
   </div>
 
   <div class="timeline-container">
@@ -32,7 +47,7 @@
 
     <section class="timeline-grid-wrapper" #timelineScroller>
       <div class="timeline-scroll" [style.width.px]="totalTimelineWidthPx">
-        <div class="timeline-header-row">
+        <div class="timeline-header-row" [attr.data-mode]="timescaleMode">
           <div
             class="time-segment"
             [class.current-segment]="segment.isCurrent"
@@ -111,13 +126,21 @@
 
 <aside class="slide-panel" [class.open]="isPanelOpen">
   <div class="panel-header">
-    <h2>Work Order Details</h2>
-    <button type="button" class="close-btn" (click)="closePanel()">&times;</button>
+    <div class="panel-title-wrap">
+      <h2>Work Order Details</h2>
+      <p>Specify the dates, name and status for this order</p>
+    </div>
+    <div class="panel-top-actions">
+      <button type="button" class="action-btn action-btn-secondary" (click)="closePanel()">Cancel</button>
+      <button type="button" class="action-btn action-btn-primary" (click)="onSubmit()">
+        {{ panelMode === 'create' ? 'Create' : 'Save' }}
+      </button>
+    </div>
   </div>
 
   <form [formGroup]="workOrderForm" (ngSubmit)="onSubmit()" class="panel-form">
     <div class="form-group">
-      <label for="order-name">Work Order Name *</label>
+      <label for="order-name">Work Order Name</label>
       <input id="order-name" type="text" class="form-control" formControlName="name" />
       <div class="error-message" *ngIf="workOrderForm.controls.name.touched && workOrderForm.controls.name.invalid">
         Work order name is required.
@@ -125,9 +148,18 @@
     </div>
 
     <div class="form-group">
-      <label for="order-status">Status *</label>
+      <label for="order-status-input">Status</label>
       <ng-select
         id="order-status"
+        labelForId="order-status-input"
+        name="status"
+        [ngClass]="{
+          'status-select-open': workOrderForm.controls.status.value === 'open',
+          'status-select-in-progress': workOrderForm.controls.status.value === 'in-progress',
+          'status-select-complete': workOrderForm.controls.status.value === 'complete',
+          'status-select-blocked': workOrderForm.controls.status.value === 'blocked'
+        }"
+        [inputAttrs]="{ name: 'order-status' }"
         formControlName="status"
         [items]="statusOptions"
         bindLabel="label"
@@ -138,37 +170,46 @@
     </div>
 
     <div class="form-group">
-      <label for="start-date">Start Date *</label>
+      <label for="end-date">End date</label>
       <div class="date-input-wrap">
-        <input id="start-date" class="form-control" ngbDatepicker #startDp="ngbDatepicker" formControlName="startDate" />
-        <button type="button" class="date-toggle-btn" aria-label="Toggle start date calendar" (click)="startDp.toggle()"></button>
+        <input
+          id="end-date"
+          class="form-control date-field"
+          ngbDatepicker
+          #endDp="ngbDatepicker"
+          formControlName="endDate"
+          (click)="openDatePicker(endDp, $event)"
+          (wheel)="$event.preventDefault()"
+          readonly
+        />
       </div>
       <div
         class="error-message"
-        *ngIf="workOrderForm.controls.startDate.touched && workOrderForm.controls.startDate.invalid"
+        *ngIf="workOrderForm.controls.endDate.touched && workOrderForm.controls.endDate.invalid"
       >
-        Start date is required.
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label for="end-date">End Date *</label>
-      <div class="date-input-wrap">
-        <input id="end-date" class="form-control" ngbDatepicker #endDp="ngbDatepicker" formControlName="endDate" />
-        <button type="button" class="date-toggle-btn" aria-label="Toggle end date calendar" (click)="endDp.toggle()"></button>
-      </div>
-      <div class="error-message" *ngIf="workOrderForm.controls.endDate.touched && workOrderForm.controls.endDate.invalid">
         End date is required.
       </div>
     </div>
 
-    <div class="error-message overlap-error" *ngIf="overlapError">{{ overlapError }}</div>
-
-    <div class="form-actions">
-      <button type="button" class="btn btn-cancel" (click)="closePanel()">Cancel</button>
-      <button type="submit" class="btn btn-primary">
-        {{ panelMode === 'create' ? 'Create' : 'Save' }}
-      </button>
+    <div class="form-group">
+      <label for="start-date">Start date</label>
+      <div class="date-input-wrap">
+        <input
+          id="start-date"
+          class="form-control date-field"
+          ngbDatepicker
+          #startDp="ngbDatepicker"
+          formControlName="startDate"
+          (click)="openDatePicker(startDp, $event)"
+          (wheel)="$event.preventDefault()"
+          readonly
+        />
+      </div>
+      <div class="error-message" *ngIf="workOrderForm.controls.startDate.touched && workOrderForm.controls.startDate.invalid">
+        Start date is required.
+      </div>
     </div>
+
+    <div class="error-message overlap-error" *ngIf="overlapError">{{ overlapError }}</div>
   </form>
 </aside>

@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
-import { NgbDatepickerModule, NgbDateStruct } from '@ng-bootstrap/ng-bootstrap';
+import { NgbDateStruct, NgbDatepickerModule, NgbInputDatepicker } from '@ng-bootstrap/ng-bootstrap';
 import { NgSelectModule } from '@ng-select/ng-select';
 
 export interface WorkCenterDocument {
@@ -57,9 +57,11 @@ interface VisualWorkOrderLayout {
 export class WorkOrderScheduleComponent implements OnInit {
   @ViewChild('timelineScroller') timelineScroller?: ElementRef<HTMLElement>;
   @ViewChild('timelineGrid') timelineGrid?: ElementRef<HTMLElement>;
+  @ViewChild('startDp', { read: NgbInputDatepicker }) startDatepicker?: NgbInputDatepicker;
+  @ViewChild('endDp', { read: NgbInputDatepicker }) endDatepicker?: NgbInputDatepicker;
 
   // @upgrade Move persistence and CRUD to a dedicated data service/repository.
-  readonly storageKey = 'work-order-schedule-v2';
+  readonly storageKey = 'work-order-schedule-v3';
 
   workCenters: WorkCenterDocument[] = [];
   workOrders: WorkOrderDocument[] = [];
@@ -70,11 +72,11 @@ export class WorkOrderScheduleComponent implements OnInit {
   visibleEndDate = new Date();
   headerSegments: HeaderSegment[] = [];
   readonly fallbackMarkerDate = new Date(2024, 8, 10);
-  readonly rowPaddingPx = 6;
-  readonly rowGapPx = 6;
+  readonly rowPaddingPx = 9;
+  readonly rowGapPx = 4;
   readonly barHeightPx = 30;
   readonly barMinWidthPx = 56;
-  readonly rowMinHeightPx = 42;
+  readonly rowMinHeightPx = 48;
 
   isPanelOpen = false;
   panelMode: 'create' | 'edit' = 'create';
@@ -82,7 +84,13 @@ export class WorkOrderScheduleComponent implements OnInit {
   selectedWorkOrderId: string | null = null;
   overlapError = '';
   openMenuOrderId: string | null = null;
+  isTimescaleOpen = false;
   readonly workOrderForm;
+  readonly timescaleOptions: Array<{ value: TimescaleMode; label: string }> = [
+    { value: 'day', label: 'Day' },
+    { value: 'week', label: 'Week' },
+    { value: 'month', label: 'Month' }
+  ];
 
   readonly statusOptions: StatusOption[] = [
     { value: 'open', label: 'Open' },
@@ -123,9 +131,33 @@ export class WorkOrderScheduleComponent implements OnInit {
     }
   }
 
-  @HostListener('document:click')
-  onDocumentClick(): void {
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    const target = event.target as HTMLElement | null;
+    const eventPath = typeof event.composedPath === 'function' ? event.composedPath() : [];
+    const isDatepickerClick =
+      !!target?.closest('.date-input-wrap, .ngb-dp, ngb-datepicker') ||
+      eventPath.some((node) => {
+        if (!(node instanceof Element)) {
+          return false;
+        }
+        if (node.tagName === 'NGB-DATEPICKER') {
+          return true;
+        }
+        const className =
+          typeof (node as Element).className === 'string' ? (node as Element).className : '';
+        return className.includes('ngb-dp');
+      });
+
     this.openMenuOrderId = null;
+    this.isTimescaleOpen = false;
+
+    if (isDatepickerClick) {
+      return;
+    }
+
+    this.startDatepicker?.close();
+    this.endDatepicker?.close();
   }
 
   get totalTimelineWidthPx(): number {
@@ -159,10 +191,38 @@ export class WorkOrderScheduleComponent implements OnInit {
 
   changeTimescale(mode: TimescaleMode): void {
     this.timescaleMode = mode;
+    this.isTimescaleOpen = false;
     this.setTimelineRange(mode);
     this.rebuildHeaderSegments();
     this.rebuildVisualLayouts();
     setTimeout(() => this.centerOnMarkerDate(), 0);
+  }
+
+  getTimescaleLabel(mode: TimescaleMode): string {
+    return this.timescaleOptions.find((option) => option.value === mode)?.label ?? 'Month';
+  }
+
+  toggleTimescaleMenu(event: MouseEvent): void {
+    event.stopPropagation();
+    this.isTimescaleOpen = !this.isTimescaleOpen;
+  }
+
+  selectTimescale(mode: TimescaleMode, event: MouseEvent): void {
+    event.stopPropagation();
+    this.changeTimescale(mode);
+  }
+
+  openDatePicker(active: NgbInputDatepicker, event: MouseEvent): void {
+    event.stopPropagation();
+    if (this.startDatepicker && this.startDatepicker !== active) {
+      this.startDatepicker.close();
+    }
+    if (this.endDatepicker && this.endDatepicker !== active) {
+      this.endDatepicker.close();
+    }
+    if (!active.isOpen()) {
+      active.open();
+    }
   }
 
   trackById(index: number, item: { docId: string }): string {
@@ -263,6 +323,8 @@ export class WorkOrderScheduleComponent implements OnInit {
   }
 
   closePanel(): void {
+    this.startDatepicker?.close();
+    this.endDatepicker?.close();
     this.isPanelOpen = false;
     this.overlapError = '';
     this.selectedWorkOrderId = null;
@@ -454,7 +516,10 @@ export class WorkOrderScheduleComponent implements OnInit {
     const totalDays = this.getDateDiffInDays(this.visibleStartDate, this.visibleEndDate);
     return Array.from({ length: totalDays }, (_, offset) => {
       const date = this.addDays(this.visibleStartDate, offset);
-      const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const isMonthBoundary = date.getDate() === 1 || offset === 0;
+      const label = isMonthBoundary
+        ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : date.toLocaleDateString('en-US', { day: 'numeric' });
       return {
         key: this.toIsoDate(date),
         label,
@@ -472,9 +537,13 @@ export class WorkOrderScheduleComponent implements OnInit {
       const end = next > this.visibleEndDate ? this.visibleEndDate : next;
       const widthDays = this.getDateDiffInDays(start, end);
       if (widthDays > 0) {
+        const isPartialWeek = widthDays < 7;
+        const label = isPartialWeek
+          ? cursor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          : `Wk ${cursor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
         headers.push({
           key: this.toIsoDate(cursor),
-          label: `Wk ${cursor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+          label,
           width: widthDays * this.pxPerDay
         });
       }
@@ -592,11 +661,15 @@ export class WorkOrderScheduleComponent implements OnInit {
   }
 
   private getSampleWorkOrders(): WorkOrderDocument[] {
-    const today = this.startOfDay(new Date());
-    const d = (offset: number): string => this.toIsoDate(this.addDays(today, offset));
+    const anchor = this.startOfDay(new Date());
+    const baseMonthStart = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+    const d = (monthOffset: number, dayOfMonth: number): string => {
+      const date = new Date(baseMonthStart.getFullYear(), baseMonthStart.getMonth() + monthOffset, dayOfMonth);
+      return this.toIsoDate(date);
+    };
 
     return [
-      // Work Center 1 (wc1) - Sequential schedule
+      // Work Center 1 (wc1)
       {
         docId: 'wo1',
         docType: 'workOrder',
@@ -604,8 +677,8 @@ export class WorkOrderScheduleComponent implements OnInit {
           name: 'Batch 24-001',
           workCenterId: 'wc1',
           status: 'complete',
-          startDate: d(-150),
-          endDate: d(-135)
+          startDate: d(-2, 4),
+          endDate: d(-2, 18)
         }
       },
       {
@@ -614,23 +687,23 @@ export class WorkOrderScheduleComponent implements OnInit {
         data: {
           name: 'Die Setup A',
           workCenterId: 'wc1',
-          status: 'open',
-          startDate: d(-120),
-          endDate: d(-105)
+          status: 'in-progress',
+          startDate: d(0, 5),
+          endDate: d(0, 16)
         }
       },
       {
-        docId: 'wo8',
+        docId: 'wo13',
         docType: 'workOrder',
         data: {
           name: 'Final Packaging Y',
           workCenterId: 'wc1',
-          status: 'complete',
-          startDate: d(50),
-          endDate: d(65)
+          status: 'open',
+          startDate: d(2, 7),
+          endDate: d(2, 21)
         }
       },
-      // Work Center 2 (wc2) - Sequential schedule
+      // Work Center 2 (wc2)
       {
         docId: 'wo3',
         docType: 'workOrder',
@@ -638,8 +711,8 @@ export class WorkOrderScheduleComponent implements OnInit {
           name: 'CNC Job #145',
           workCenterId: 'wc2',
           status: 'in-progress',
-          startDate: d(-90),
-          endDate: d(-75)
+          startDate: d(-1, 10),
+          endDate: d(-1, 24)
         }
       },
       {
@@ -649,22 +722,22 @@ export class WorkOrderScheduleComponent implements OnInit {
           name: 'Fixture Rework',
           workCenterId: 'wc2',
           status: 'open',
-          startDate: d(-60),
-          endDate: d(-45)
+          startDate: d(1, 3),
+          endDate: d(1, 15)
         }
       },
       {
-        docId: 'wo10',
+        docId: 'wo14',
         docType: 'workOrder',
         data: {
           name: 'Advanced Machining',
           workCenterId: 'wc2',
-          status: 'open',
-          startDate: d(110),
-          endDate: d(125)
+          status: 'complete',
+          startDate: d(3, 9),
+          endDate: d(3, 23)
         }
       },
-      // Work Center 3 (wc3) - Sequential schedule
+      // Work Center 3 (wc3)
       {
         docId: 'wo5',
         docType: 'workOrder',
@@ -672,8 +745,8 @@ export class WorkOrderScheduleComponent implements OnInit {
           name: 'Assembly Pack B',
           workCenterId: 'wc3',
           status: 'in-progress',
-          startDate: d(-30),
-          endDate: d(-15)
+          startDate: d(-3, 12),
+          endDate: d(-3, 27)
         }
       },
       {
@@ -682,12 +755,23 @@ export class WorkOrderScheduleComponent implements OnInit {
         data: {
           name: 'Spring Assembly',
           workCenterId: 'wc3',
-          status: 'open',
-          startDate: d(80),
-          endDate: d(95)
+          status: 'blocked',
+          startDate: d(0, 19),
+          endDate: d(1, 4)
         }
       },
-      // Work Center 4 (wc4) - Sequential schedule
+      {
+        docId: 'wo15',
+        docType: 'workOrder',
+        data: {
+          name: 'Complex Systems',
+          workCenterId: 'wc3',
+          status: 'open',
+          startDate: d(4, 6),
+          endDate: d(4, 20)
+        }
+      },
+      // Work Center 4 (wc4)
       {
         docId: 'wo6',
         docType: 'workOrder',
@@ -695,8 +779,8 @@ export class WorkOrderScheduleComponent implements OnInit {
           name: 'QC Hold 001',
           workCenterId: 'wc4',
           status: 'blocked',
-          startDate: d(-10),
-          endDate: d(5)
+          startDate: d(-2, 20),
+          endDate: d(-1, 7)
         }
       },
       {
@@ -706,11 +790,22 @@ export class WorkOrderScheduleComponent implements OnInit {
           name: 'Tooling Setup',
           workCenterId: 'wc4',
           status: 'open',
-          startDate: d(140),
-          endDate: d(155)
+          startDate: d(4, 2),
+          endDate: d(4, 18)
         }
       },
-      // Work Center 5 (wc5) - Sequential schedule
+      {
+        docId: 'wo16',
+        docType: 'workOrder',
+        data: {
+          name: 'Final Inspection',
+          workCenterId: 'wc4',
+          status: 'in-progress',
+          startDate: d(5, 5),
+          endDate: d(5, 18)
+        }
+      },
+      // Work Center 5 (wc5)
       {
         docId: 'wo7',
         docType: 'workOrder',
@@ -718,8 +813,8 @@ export class WorkOrderScheduleComponent implements OnInit {
           name: 'Final Packaging X',
           workCenterId: 'wc5',
           status: 'open',
-          startDate: d(20),
-          endDate: d(35)
+          startDate: d(-1, 4),
+          endDate: d(-1, 18)
         }
       },
       {
@@ -728,9 +823,20 @@ export class WorkOrderScheduleComponent implements OnInit {
         data: {
           name: 'Quality Control Pass',
           workCenterId: 'wc5',
-          status: 'open',
-          startDate: d(170),
-          endDate: d(185)
+          status: 'complete',
+          startDate: d(1, 20),
+          endDate: d(2, 6)
+        }
+      },
+      {
+        docId: 'wo17',
+        docType: 'workOrder',
+        data: {
+          name: 'Packaging Transfer',
+          workCenterId: 'wc5',
+          status: 'blocked',
+          startDate: d(4, 11),
+          endDate: d(4, 25)
         }
       }
     ];
