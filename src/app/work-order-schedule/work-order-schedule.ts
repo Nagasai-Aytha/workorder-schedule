@@ -40,6 +40,13 @@ interface StatusOption {
   label: string;
 }
 
+interface VisualWorkOrderLayout {
+  order: WorkOrderDocument;
+  leftPx: number;
+  widthPx: number;
+  lane: number;
+}
+
 @Component({
   selector: 'app-work-order-schedule',
   standalone: true,
@@ -57,12 +64,17 @@ export class WorkOrderScheduleComponent implements OnInit {
   workCenters: WorkCenterDocument[] = [];
   workOrders: WorkOrderDocument[] = [];
 
-  timescaleMode: TimescaleMode = 'day';
-  pxPerDay = 24;
+  timescaleMode: TimescaleMode = 'month';
+  pxPerDay = 3;
   visibleStartDate = new Date();
   visibleEndDate = new Date();
   headerSegments: HeaderSegment[] = [];
   readonly fallbackMarkerDate = new Date(2024, 8, 10);
+  readonly rowPaddingPx = 6;
+  readonly rowGapPx = 6;
+  readonly barHeightPx = 30;
+  readonly barMinWidthPx = 56;
+  readonly rowMinHeightPx = 42;
 
   isPanelOpen = false;
   panelMode: 'create' | 'edit' = 'create';
@@ -78,6 +90,8 @@ export class WorkOrderScheduleComponent implements OnInit {
     { value: 'complete', label: 'Complete' },
     { value: 'blocked', label: 'Blocked' }
   ];
+  private readonly layoutsByCenter = new Map<string, VisualWorkOrderLayout[]>();
+  private readonly rowHeightsByCenter = new Map<string, number>();
 
   constructor(private readonly fb: FormBuilder) {
     this.workOrderForm = this.fb.group({
@@ -98,6 +112,7 @@ export class WorkOrderScheduleComponent implements OnInit {
     this.setTimelineRange(this.timescaleMode);
     this.loadData();
     this.rebuildHeaderSegments();
+    this.rebuildVisualLayouts();
     setTimeout(() => this.centerOnMarkerDate(), 0);
   }
 
@@ -126,10 +141,27 @@ export class WorkOrderScheduleComponent implements OnInit {
     return Array.from({ length: days }, (_, index) => index);
   }
 
+  get monthSeparators(): Array<{ left: number }> {
+    const separators: Array<{ left: number }> = [];
+    let cursor = new Date(this.visibleStartDate.getFullYear(), this.visibleStartDate.getMonth(), 1);
+    
+    while (cursor < this.visibleEndDate) {
+      const next = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+      if (next > this.visibleStartDate && next <= this.visibleEndDate) {
+        const left = this.dateToOffsetPx(next);
+        separators.push({ left });
+      }
+      cursor = next;
+    }
+    
+    return separators;
+  }
+
   changeTimescale(mode: TimescaleMode): void {
     this.timescaleMode = mode;
     this.setTimelineRange(mode);
     this.rebuildHeaderSegments();
+    this.rebuildVisualLayouts();
     setTimeout(() => this.centerOnMarkerDate(), 0);
   }
 
@@ -137,20 +169,34 @@ export class WorkOrderScheduleComponent implements OnInit {
     return item.docId;
   }
 
-  getWorkOrdersForCenter(centerId: string): WorkOrderDocument[] {
-    return this.workOrders
-      .filter((workOrder) => workOrder.data.workCenterId === centerId)
-      .sort((a, b) => a.data.startDate.localeCompare(b.data.startDate));
+  getVisualWorkOrdersForCenter(centerId: string): VisualWorkOrderLayout[] {
+    return this.layoutsByCenter.get(centerId) ?? [];
   }
 
-  calculatePosition(order: WorkOrderDocument): { left: string; width: string } {
+  getRowHeight(centerId: string): number {
+    return this.rowHeightsByCenter.get(centerId) ?? this.rowMinHeightPx;
+  }
+
+  getBarTopPx(lane: number): number {
+    return this.rowPaddingPx + lane * (this.barHeightPx + this.rowGapPx);
+  }
+
+  showStatusBadge(widthPx: number): boolean {
+    return widthPx >= 140;
+  }
+
+  trackByLayout(index: number, item: VisualWorkOrderLayout): string {
+    return item.order.docId;
+  }
+
+  calculatePosition(order: WorkOrderDocument): { leftPx: number; widthPx: number } {
     const start = new Date(order.data.startDate);
     const end = new Date(order.data.endDate);
     const leftPx = this.clampOffset(this.dateToOffsetPx(start));
-    const widthPx = Math.max(this.getDateDiffInDays(start, end) * this.pxPerDay, 32);
+    const widthPx = Math.max(this.getDateDiffInDays(start, end) * this.pxPerDay, this.barMinWidthPx);
     return {
-      left: `${leftPx}px`,
-      width: `${widthPx}px`
+      leftPx,
+      widthPx
     };
   }
 
@@ -226,6 +272,7 @@ export class WorkOrderScheduleComponent implements OnInit {
     event?.stopPropagation();
     this.openMenuOrderId = null;
     this.workOrders = this.workOrders.filter((item) => item.docId !== order.docId);
+    this.rebuildVisualLayouts();
     this.persistWorkOrders();
   }
 
@@ -279,6 +326,7 @@ export class WorkOrderScheduleComponent implements OnInit {
       );
     }
 
+    this.rebuildVisualLayouts();
     this.persistWorkOrders();
     this.closePanel();
   }
@@ -308,6 +356,45 @@ export class WorkOrderScheduleComponent implements OnInit {
 
   private persistWorkOrders(): void {
     localStorage.setItem(this.storageKey, JSON.stringify(this.workOrders));
+  }
+
+  private rebuildVisualLayouts(): void {
+    this.layoutsByCenter.clear();
+    this.rowHeightsByCenter.clear();
+
+    this.workCenters.forEach((center) => {
+      const orders = this.workOrders
+        .filter((workOrder) => workOrder.data.workCenterId === center.docId)
+        .sort((a, b) => a.data.startDate.localeCompare(b.data.startDate));
+
+      const laneRightBoundaries: number[] = [];
+      const layouts: VisualWorkOrderLayout[] = [];
+
+      orders.forEach((order) => {
+        const position = this.calculatePosition(order);
+        const rightPx = position.leftPx + position.widthPx;
+        let lane = laneRightBoundaries.findIndex((laneRightPx) => position.leftPx >= laneRightPx);
+        if (lane === -1) {
+          lane = laneRightBoundaries.length;
+          laneRightBoundaries.push(rightPx);
+        } else {
+          laneRightBoundaries[lane] = rightPx;
+        }
+
+        layouts.push({
+          order,
+          leftPx: position.leftPx,
+          widthPx: position.widthPx,
+          lane
+        });
+      });
+
+      const lanes = Math.max(laneRightBoundaries.length, 1);
+      const rowHeight =
+        this.rowPaddingPx * 2 + lanes * this.barHeightPx + (lanes - 1) * this.rowGapPx;
+      this.layoutsByCenter.set(center.docId, layouts);
+      this.rowHeightsByCenter.set(center.docId, Math.max(rowHeight, this.rowMinHeightPx));
+    });
   }
 
   private hasOverlap(
@@ -505,11 +592,11 @@ export class WorkOrderScheduleComponent implements OnInit {
   }
 
   private getSampleWorkOrders(): WorkOrderDocument[] {
-    // @upgrade Replace seed data with API-backed documents once backend is available.
     const today = this.startOfDay(new Date());
     const d = (offset: number): string => this.toIsoDate(this.addDays(today, offset));
 
     return [
+      // Work Center 1 (wc1) - Sequential schedule
       {
         docId: 'wo1',
         docType: 'workOrder',
@@ -517,8 +604,8 @@ export class WorkOrderScheduleComponent implements OnInit {
           name: 'Batch 24-001',
           workCenterId: 'wc1',
           status: 'complete',
-          startDate: d(-35),
-          endDate: d(-24)
+          startDate: d(-150),
+          endDate: d(-135)
         }
       },
       {
@@ -528,63 +615,8 @@ export class WorkOrderScheduleComponent implements OnInit {
           name: 'Die Setup A',
           workCenterId: 'wc1',
           status: 'open',
-          startDate: d(-18),
-          endDate: d(-9)
-        }
-      },
-      {
-        docId: 'wo3',
-        docType: 'workOrder',
-        data: {
-          name: 'CNC Job #145',
-          workCenterId: 'wc2',
-          status: 'in-progress',
-          startDate: d(-12),
-          endDate: d(-2)
-        }
-      },
-      {
-        docId: 'wo4',
-        docType: 'workOrder',
-        data: {
-          name: 'Fixture Rework',
-          workCenterId: 'wc2',
-          status: 'open',
-          startDate: d(3),
-          endDate: d(10)
-        }
-      },
-      {
-        docId: 'wo5',
-        docType: 'workOrder',
-        data: {
-          name: 'Assembly Pack B',
-          workCenterId: 'wc3',
-          status: 'in-progress',
-          startDate: d(-5),
-          endDate: d(6)
-        }
-      },
-      {
-        docId: 'wo6',
-        docType: 'workOrder',
-        data: {
-          name: 'QC Hold 001',
-          workCenterId: 'wc4',
-          status: 'blocked',
-          startDate: d(-20),
-          endDate: d(-12)
-        }
-      },
-      {
-        docId: 'wo7',
-        docType: 'workOrder',
-        data: {
-          name: 'Final Packaging X',
-          workCenterId: 'wc5',
-          status: 'open',
-          startDate: d(8),
-          endDate: d(17)
+          startDate: d(-120),
+          endDate: d(-105)
         }
       },
       {
@@ -594,10 +626,114 @@ export class WorkOrderScheduleComponent implements OnInit {
           name: 'Final Packaging Y',
           workCenterId: 'wc1',
           status: 'complete',
-          startDate: d(14),
-          endDate: d(24)
+          startDate: d(50),
+          endDate: d(65)
+        }
+      },
+      // Work Center 2 (wc2) - Sequential schedule
+      {
+        docId: 'wo3',
+        docType: 'workOrder',
+        data: {
+          name: 'CNC Job #145',
+          workCenterId: 'wc2',
+          status: 'in-progress',
+          startDate: d(-90),
+          endDate: d(-75)
+        }
+      },
+      {
+        docId: 'wo4',
+        docType: 'workOrder',
+        data: {
+          name: 'Fixture Rework',
+          workCenterId: 'wc2',
+          status: 'open',
+          startDate: d(-60),
+          endDate: d(-45)
+        }
+      },
+      {
+        docId: 'wo10',
+        docType: 'workOrder',
+        data: {
+          name: 'Advanced Machining',
+          workCenterId: 'wc2',
+          status: 'open',
+          startDate: d(110),
+          endDate: d(125)
+        }
+      },
+      // Work Center 3 (wc3) - Sequential schedule
+      {
+        docId: 'wo5',
+        docType: 'workOrder',
+        data: {
+          name: 'Assembly Pack B',
+          workCenterId: 'wc3',
+          status: 'in-progress',
+          startDate: d(-30),
+          endDate: d(-15)
+        }
+      },
+      {
+        docId: 'wo9',
+        docType: 'workOrder',
+        data: {
+          name: 'Spring Assembly',
+          workCenterId: 'wc3',
+          status: 'open',
+          startDate: d(80),
+          endDate: d(95)
+        }
+      },
+      // Work Center 4 (wc4) - Sequential schedule
+      {
+        docId: 'wo6',
+        docType: 'workOrder',
+        data: {
+          name: 'QC Hold 001',
+          workCenterId: 'wc4',
+          status: 'blocked',
+          startDate: d(-10),
+          endDate: d(5)
+        }
+      },
+      {
+        docId: 'wo11',
+        docType: 'workOrder',
+        data: {
+          name: 'Tooling Setup',
+          workCenterId: 'wc4',
+          status: 'open',
+          startDate: d(140),
+          endDate: d(155)
+        }
+      },
+      // Work Center 5 (wc5) - Sequential schedule
+      {
+        docId: 'wo7',
+        docType: 'workOrder',
+        data: {
+          name: 'Final Packaging X',
+          workCenterId: 'wc5',
+          status: 'open',
+          startDate: d(20),
+          endDate: d(35)
+        }
+      },
+      {
+        docId: 'wo12',
+        docType: 'workOrder',
+        data: {
+          name: 'Quality Control Pass',
+          workCenterId: 'wc5',
+          status: 'open',
+          startDate: d(170),
+          endDate: d(185)
         }
       }
     ];
   }
 }
+

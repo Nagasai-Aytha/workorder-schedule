@@ -22,14 +22,6 @@
 }
 
 .timeline-header {
-  .brand {
-    color: var(--brand);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.09em;
-    margin-bottom: 28px;
-  }
-
   .title {
     margin: 0 0 16px;
     font-size: 38px;
@@ -91,7 +83,7 @@
   }
 
   .work-center-row {
-    height: 42px;
+    min-height: 42px;
     display: flex;
     align-items: center;
     border-bottom: 1px solid var(--grid-border);
@@ -177,6 +169,22 @@
   }
 }
 
+.month-separators {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+
+  .month-separator {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--grid-border);
+    box-shadow: inset 1px 0 0 rgba(0, 0, 0, 0.05);
+  }
+}
+
 .work-order-rows {
   position: relative;
   z-index: 2;
@@ -184,7 +192,7 @@
 
 .work-order-row {
   position: relative;
-  height: 42px;
+  min-height: 42px;
   border-bottom: 1px solid var(--grid-border);
   transition: background 0.12s ease;
 
@@ -195,7 +203,6 @@
 
 .work-order-bar {
   position: absolute;
-  top: 6px;
   height: 30px;
   border-radius: 6px;
   padding: 0 8px;
@@ -204,7 +211,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  min-width: 92px;
   box-shadow: none;
 }
 

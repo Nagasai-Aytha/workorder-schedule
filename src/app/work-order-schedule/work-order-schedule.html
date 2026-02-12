@@ -1,6 +1,6 @@
 <div class="work-order-timeline">
   <header class="timeline-header">
-    <div class="brand">NAOLOGIC</div>
+<img src="assets/images/naologic.png" alt="NAOLOGIC" class="logo" />
     <h1 class="title">Work Orders</h1>
   </header>
 
@@ -21,7 +21,11 @@
   <div class="timeline-container">
     <aside class="work-centers-sidebar">
       <div class="sidebar-header">Work Center</div>
-      <div class="work-center-row" *ngFor="let center of workCenters; trackBy: trackById">
+      <div
+        class="work-center-row"
+        *ngFor="let center of workCenters; trackBy: trackById"
+        [style.height.px]="getRowHeight(center.docId)"
+      >
         <span class="center-name">{{ center.data.name }}</span>
       </div>
     </aside>
@@ -47,36 +51,51 @@
             <div class="day-column" *ngFor="let day of timelineDays"></div>
           </div>
 
+          <div class="month-separators">
+            <div 
+              class="month-separator" 
+              *ngFor="let separator of monthSeparators"
+              [style.left.px]="separator.left"
+            ></div>
+          </div>
+
           <div class="work-order-rows">
             <div
               class="work-order-row"
               *ngFor="let center of workCenters; trackBy: trackById"
+              [style.height.px]="getRowHeight(center.docId)"
               (click)="onTimelineClick(center.docId, $event)"
             >
               <div
                 class="work-order-bar"
-                *ngFor="let order of getWorkOrdersForCenter(center.docId); trackBy: trackById"
-                [style.left]="calculatePosition(order).left"
-                [style.width]="calculatePosition(order).width"
-                [ngClass]="getStatusClass(order.data.status)"
+                *ngFor="let layout of getVisualWorkOrdersForCenter(center.docId); trackBy: trackByLayout"
+                [style.left.px]="layout.leftPx"
+                [style.width.px]="layout.widthPx"
+                [style.top.px]="getBarTopPx(layout.lane)"
+                [ngClass]="getStatusClass(layout.order.data.status)"
                 (click)="$event.stopPropagation()"
+                [title]="layout.order.data.name"
               >
                 <div class="bar-content">
-                  <span class="order-name">{{ order.data.name }}</span>
-                  <span class="status-badge" [ngClass]="getStatusClass(order.data.status)">
-                    {{ getStatusLabel(order.data.status) }}
+                  <span class="order-name">{{ layout.order.data.name }}</span>
+                  <span
+                    class="status-badge"
+                    [ngClass]="getStatusClass(layout.order.data.status)"
+                    *ngIf="showStatusBadge(layout.widthPx)"
+                  >
+                    {{ getStatusLabel(layout.order.data.status) }}
                   </span>
                 </div>
 
                 <div class="three-dot-menu">
-                  <button class="menu-trigger" (click)="toggleOrderMenu(order.docId, $event)" aria-label="Actions">
+                  <button class="menu-trigger" (click)="toggleOrderMenu(layout.order.docId, $event)" aria-label="Actions">
                     <span class="dot"></span>
                     <span class="dot"></span>
                     <span class="dot"></span>
                   </button>
-                  <div class="menu-dropdown" *ngIf="isMenuOpen(order.docId)">
-                    <button type="button" (click)="openEditPanel(order, $event)">Edit</button>
-                    <button type="button" class="delete-btn" (click)="deleteWorkOrder(order, $event)">Delete</button>
+                  <div class="menu-dropdown" *ngIf="isMenuOpen(layout.order.docId)">
+                    <button type="button" (click)="openEditPanel(layout.order, $event)">Edit</button>
+                    <button type="button" class="delete-btn" (click)="deleteWorkOrder(layout.order, $event)">Delete</button>
                   </div>
                 </div>
               </div>
