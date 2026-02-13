@@ -2,7 +2,6 @@ import { CommonModule } from '@angular/common';
 import { Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
-import { NgbDateStruct, NgbDatepickerModule, NgbInputDatepicker } from '@ng-bootstrap/ng-bootstrap';
 import { NgSelectModule } from '@ng-select/ng-select';
 
 export interface WorkCenterDocument {
@@ -50,15 +49,13 @@ interface VisualWorkOrderLayout {
 @Component({
   selector: 'app-work-order-schedule',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, NgbDatepickerModule, NgSelectModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, NgSelectModule],
   templateUrl: './work-order-schedule.html',
   styleUrl: './work-order-schedule.scss'
 })
 export class WorkOrderScheduleComponent implements OnInit {
   @ViewChild('timelineScroller') timelineScroller?: ElementRef<HTMLElement>;
   @ViewChild('timelineGrid') timelineGrid?: ElementRef<HTMLElement>;
-  @ViewChild('startDp', { read: NgbInputDatepicker }) startDatepicker?: NgbInputDatepicker;
-  @ViewChild('endDp', { read: NgbInputDatepicker }) endDatepicker?: NgbInputDatepicker;
 
   // @upgrade Move persistence and CRUD to a dedicated data service/repository.
   readonly storageKey = 'work-order-schedule-v3';
@@ -105,14 +102,8 @@ export class WorkOrderScheduleComponent implements OnInit {
     this.workOrderForm = this.fb.group({
       name: this.fb.nonNullable.control('', [Validators.required, Validators.maxLength(80)]),
       status: this.fb.nonNullable.control<WorkOrderStatus>('open', Validators.required),
-      startDate: this.fb.nonNullable.control<NgbDateStruct>(
-        this.toStruct(new Date()),
-        Validators.required
-      ),
-      endDate: this.fb.nonNullable.control<NgbDateStruct>(
-        this.toStruct(this.addDays(new Date(), 7)),
-        Validators.required
-      )
+      startDate: this.fb.nonNullable.control(this.toIsoDate(new Date()), Validators.required),
+      endDate: this.fb.nonNullable.control(this.toIsoDate(this.addDays(new Date(), 7)), Validators.required)
     });
   }
 
@@ -132,32 +123,23 @@ export class WorkOrderScheduleComponent implements OnInit {
   }
 
   @HostListener('document:click', ['$event'])
-  onDocumentClick(event: MouseEvent): void {
-    const target = event.target as HTMLElement | null;
-    const eventPath = typeof event.composedPath === 'function' ? event.composedPath() : [];
-    const isDatepickerClick =
-      !!target?.closest('.date-input-wrap, .ngb-dp, ngb-datepicker') ||
-      eventPath.some((node) => {
-        if (!(node instanceof Element)) {
-          return false;
-        }
-        if (node.tagName === 'NGB-DATEPICKER') {
-          return true;
-        }
-        const className =
-          typeof (node as Element).className === 'string' ? (node as Element).className : '';
-        return className.includes('ngb-dp');
-      });
-
+  onDocumentClick(_event: MouseEvent): void {
     this.openMenuOrderId = null;
     this.isTimescaleOpen = false;
+  }
 
-    if (isDatepickerClick) {
+  openNativeDatePicker(event: MouseEvent): void {
+    event.stopPropagation();
+    const input = event.currentTarget as HTMLInputElement | null;
+    if (!input) {
       return;
     }
 
-    this.startDatepicker?.close();
-    this.endDatepicker?.close();
+    input.focus();
+    const maybeShowPicker = (input as HTMLInputElement & { showPicker?: () => void }).showPicker;
+    if (typeof maybeShowPicker === 'function') {
+      maybeShowPicker.call(input);
+    }
   }
 
   get totalTimelineWidthPx(): number {
@@ -210,19 +192,6 @@ export class WorkOrderScheduleComponent implements OnInit {
   selectTimescale(mode: TimescaleMode, event: MouseEvent): void {
     event.stopPropagation();
     this.changeTimescale(mode);
-  }
-
-  openDatePicker(active: NgbInputDatepicker, event: MouseEvent): void {
-    event.stopPropagation();
-    if (this.startDatepicker && this.startDatepicker !== active) {
-      this.startDatepicker.close();
-    }
-    if (this.endDatepicker && this.endDatepicker !== active) {
-      this.endDatepicker.close();
-    }
-    if (!active.isOpen()) {
-      active.open();
-    }
   }
 
   trackById(index: number, item: { docId: string }): string {
@@ -297,8 +266,8 @@ export class WorkOrderScheduleComponent implements OnInit {
     this.workOrderForm.reset({
       name: '',
       status: 'open',
-      startDate: this.toStruct(startDate),
-      endDate: this.toStruct(this.addDays(startDate, 7))
+      startDate: this.toIsoDate(startDate),
+      endDate: this.toIsoDate(this.addDays(startDate, 7))
     });
 
     this.isPanelOpen = true;
@@ -315,16 +284,14 @@ export class WorkOrderScheduleComponent implements OnInit {
     this.workOrderForm.reset({
       name: order.data.name,
       status: order.data.status,
-      startDate: this.isoToStruct(order.data.startDate),
-      endDate: this.isoToStruct(order.data.endDate)
+      startDate: order.data.startDate,
+      endDate: order.data.endDate
     });
 
     this.isPanelOpen = true;
   }
 
   closePanel(): void {
-    this.startDatepicker?.close();
-    this.endDatepicker?.close();
     this.isPanelOpen = false;
     this.overlapError = '';
     this.selectedWorkOrderId = null;
@@ -344,8 +311,12 @@ export class WorkOrderScheduleComponent implements OnInit {
       return;
     }
 
-    const startDate = this.structToDate(this.workOrderForm.controls.startDate.value);
-    const endDate = this.structToDate(this.workOrderForm.controls.endDate.value);
+    const startDate = this.isoStringToDate(this.workOrderForm.controls.startDate.value);
+    const endDate = this.isoStringToDate(this.workOrderForm.controls.endDate.value);
+    if (!startDate || !endDate) {
+      this.overlapError = 'Please enter valid start and end dates.';
+      return;
+    }
     if (endDate <= startDate) {
       this.overlapError = 'End date must be after start date.';
       return;
@@ -620,21 +591,15 @@ export class WorkOrderScheduleComponent implements OnInit {
     return `${year}-${month}-${day}`;
   }
 
-  private toStruct(date: Date): NgbDateStruct {
-    return {
-      year: date.getFullYear(),
-      month: date.getMonth() + 1,
-      day: date.getDate()
-    };
-  }
-
-  private structToDate(struct: NgbDateStruct): Date {
-    return new Date(struct.year, struct.month - 1, struct.day);
-  }
-
-  private isoToStruct(value: string): NgbDateStruct {
+  private isoStringToDate(value: string): Date | null {
+    if (!value) {
+      return null;
+    }
     const [year, month, day] = value.split('-').map(Number);
-    return { year, month, day };
+    if (!year || !month || !day) {
+      return null;
+    }
+    return new Date(year, month - 1, day);
   }
 
   private getMarkerDate(): Date {

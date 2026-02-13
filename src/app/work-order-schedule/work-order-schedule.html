@@ -175,12 +175,9 @@
         <input
           id="end-date"
           class="form-control date-field"
-          ngbDatepicker
-          #endDp="ngbDatepicker"
+          type="date"
           formControlName="endDate"
-          (click)="openDatePicker(endDp, $event)"
-          (wheel)="$event.preventDefault()"
-          readonly
+          (click)="openNativeDatePicker($event)"
         />
       </div>
       <div
@@ -197,12 +194,9 @@
         <input
           id="start-date"
           class="form-control date-field"
-          ngbDatepicker
-          #startDp="ngbDatepicker"
+          type="date"
           formControlName="startDate"
-          (click)="openDatePicker(startDp, $event)"
-          (wheel)="$event.preventDefault()"
-          readonly
+          (click)="openNativeDatePicker($event)"
         />
       </div>
       <div class="error-message" *ngIf="workOrderForm.controls.startDate.touched && workOrderForm.controls.startDate.invalid">
