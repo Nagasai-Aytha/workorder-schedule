@@ -32,7 +32,7 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Build app
-        run: npm run build -- --configuration development
+        run: npm run build:pages
 
       - name: Add SPA fallback
         run: cp dist/workorder-schedule/browser/index.html dist/workorder-schedule/browser/404.html
