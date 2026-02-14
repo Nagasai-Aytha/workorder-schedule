@@ -5,10 +5,14 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:dev": "ng build --configuration development",
+    "build:pages": "ng build --configuration development --base-href /workorder-scheduler/",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "e2e": "playwright test",
-    "e2e:headed": "playwright test --headed"
+    "e2e:headed": "playwright test --headed",
+    "predeploy": "npm run build:pages",
+    "deploy": "gh-pages -d dist/workorder-schedule/browser"
   },
   "prettier": {
     "printWidth": 100,
@@ -44,6 +48,7 @@
     "@angular/compiler-cli": "^21.1.0",
     "@playwright/test": "^1.58.2",
     "@vitest/coverage-v8": "^4.0.18",
+    "gh-pages": "^6.3.0",
     "jsdom": "^27.1.0",
     "typescript": "~5.9.2",
     "vitest": "^4.0.8"
