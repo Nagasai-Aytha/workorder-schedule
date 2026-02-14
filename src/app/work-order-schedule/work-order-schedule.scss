@@ -746,6 +746,10 @@
   box-shadow: 0 8px 18px rgba(36, 43, 71, 0.12);
 }
 
+:host ::ng-deep .ngb-dp-container {
+  z-index: 130;
+}
+
 :host
   ::ng-deep
   .ng-select.ng-select-single
@@ -854,8 +858,14 @@
     top: 0;
     right: 0;
     width: 100%;
-    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
     border-radius: 0;
+    transform: none;
+    transition:
+      opacity 0.2s ease,
+      box-shadow 0.2s ease;
+    overflow-y: auto;
   }
 
   .panel-header {
@@ -865,6 +875,26 @@
 
   .panel-top-actions {
     width: 100%;
+  }
+
+  .panel-form {
+    overflow: visible;
+    flex: 0 0 auto;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .form-control.date-field {
+    appearance: auto;
+    -webkit-appearance: auto;
+    position: static;
+
+    &::-webkit-calendar-picker-indicator {
+      opacity: 1;
+      width: auto;
+      height: auto;
+      margin: 0;
+      position: static;
+    }
   }
 }
 

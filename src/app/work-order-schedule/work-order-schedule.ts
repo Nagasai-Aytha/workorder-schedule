@@ -1,8 +1,19 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, HostListener, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, Injectable, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
 import { NgSelectModule } from '@ng-select/ng-select';
+import {
+  NgbDateAdapter,
+  NgbDateParserFormatter,
+  NgbDateStruct,
+  NgbDatepickerModule,
+  NgbInputDatepicker
+} from '@ng-bootstrap/ng-bootstrap';
+import {
+  SAMPLE_WORK_CENTERS,
+  SAMPLE_WORK_ORDER_SEEDS
+} from './work-order-schedule.data';
 
 export interface WorkCenterDocument {
   docId: string;
@@ -46,16 +57,69 @@ interface VisualWorkOrderLayout {
   lane: number;
 }
 
+@Injectable()
+class IsoDateAdapter extends NgbDateAdapter<string> {
+  override fromModel(value: string | null): NgbDateStruct | null {
+    if (!value) {
+      return null;
+    }
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) {
+      return null;
+    }
+    return { year, month, day };
+  }
+
+  override toModel(date: NgbDateStruct | null): string | null {
+    if (!date) {
+      return null;
+    }
+    const month = String(date.month).padStart(2, '0');
+    const day = String(date.day).padStart(2, '0');
+    return `${date.year}-${month}-${day}`;
+  }
+}
+
+@Injectable()
+class IsoDateParserFormatter extends NgbDateParserFormatter {
+  override parse(value: string): NgbDateStruct | null {
+    if (!value) {
+      return null;
+    }
+    const [year, month, day] = value.trim().split('-').map(Number);
+    if (!year || !month || !day) {
+      return null;
+    }
+    return { year, month, day };
+  }
+
+  override format(date: NgbDateStruct | null): string {
+    if (!date) {
+      return '';
+    }
+    const month = String(date.month).padStart(2, '0');
+    const day = String(date.day).padStart(2, '0');
+    return `${date.year}-${month}-${day}`;
+  }
+}
+
 @Component({
   selector: 'app-work-order-schedule',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, NgSelectModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, NgSelectModule, NgbDatepickerModule],
   templateUrl: './work-order-schedule.html',
-  styleUrl: './work-order-schedule.scss'
+  styleUrl: './work-order-schedule.scss',
+  providers: [
+    { provide: NgbDateAdapter, useClass: IsoDateAdapter },
+    { provide: NgbDateParserFormatter, useClass: IsoDateParserFormatter }
+  ]
 })
 export class WorkOrderScheduleComponent implements OnInit {
   @ViewChild('timelineScroller') timelineScroller?: ElementRef<HTMLElement>;
   @ViewChild('timelineGrid') timelineGrid?: ElementRef<HTMLElement>;
+  @ViewChild('slidePanel') slidePanel?: ElementRef<HTMLElement>;
+  @ViewChild('startDatePicker') startDatePicker?: NgbInputDatepicker;
+  @ViewChild('endDatePicker') endDatePicker?: NgbInputDatepicker;
 
   // @upgrade Move persistence and CRUD to a dedicated data service/repository.
   readonly storageKey = 'work-order-schedule-v3';
@@ -97,6 +161,7 @@ export class WorkOrderScheduleComponent implements OnInit {
   ];
   private readonly layoutsByCenter = new Map<string, VisualWorkOrderLayout[]>();
   private readonly rowHeightsByCenter = new Map<string, number>();
+  private activeDatepicker: NgbInputDatepicker | null = null;
 
   constructor(private readonly fb: FormBuilder) {
     this.workOrderForm = this.fb.group({
@@ -122,23 +187,73 @@ export class WorkOrderScheduleComponent implements OnInit {
     }
   }
 
+  @HostListener('document:keydown', ['$event'])
+  onDocumentKeydown(event: KeyboardEvent): void {
+    if (!this.isPanelOpen || event.key !== 'Tab') {
+      return;
+    }
+
+    const panel = this.slidePanel?.nativeElement;
+    const active = document.activeElement as HTMLElement | null;
+    if (panel && (!active || !panel.contains(active))) {
+      event.preventDefault();
+      panel.focus();
+      return;
+    }
+
+    const focusable = this.getPanelFocusableElements();
+    if (focusable.length === 0) {
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+
+    if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   @HostListener('document:click', ['$event'])
-  onDocumentClick(_event: MouseEvent): void {
+  onDocumentClick(event: MouseEvent): void {
     this.openMenuOrderId = null;
     this.isTimescaleOpen = false;
   }
 
-  openNativeDatePicker(event: MouseEvent): void {
-    event.stopPropagation();
-    const input = event.currentTarget as HTMLInputElement | null;
-    if (!input) {
-      return;
+  @HostListener('document:pointerdown', ['$event'])
+  onDocumentPointerDown(event: PointerEvent): void {
+    const target = event.target as HTMLElement | null;
+    const clickedInsideDatepicker =
+      !!target?.closest('.ngb-dp') || !!target?.closest('.date-picker-input');
+    if (!clickedInsideDatepicker) {
+      this.closeAllDatePickers();
     }
+  }
 
-    input.focus();
-    const maybeShowPicker = (input as HTMLInputElement & { showPicker?: () => void }).showPicker;
-    if (typeof maybeShowPicker === 'function') {
-      maybeShowPicker.call(input);
+  openDatePicker(datepicker: NgbInputDatepicker, event?: Event): void {
+    event?.stopPropagation();
+    if (this.activeDatepicker && this.activeDatepicker !== datepicker) {
+      this.activeDatepicker.close();
+    }
+    if (!datepicker.isOpen()) {
+      datepicker.open();
+    }
+    this.activeDatepicker = datepicker;
+  }
+
+  closeDatePicker(datepicker: NgbInputDatepicker): void {
+    if (datepicker.isOpen()) {
+      datepicker.close();
+    }
+    if (this.activeDatepicker === datepicker) {
+      this.activeDatepicker = null;
     }
   }
 
@@ -292,6 +407,7 @@ export class WorkOrderScheduleComponent implements OnInit {
   }
 
   closePanel(): void {
+    this.closeAllDatePickers();
     this.isPanelOpen = false;
     this.overlapError = '';
     this.selectedWorkOrderId = null;
@@ -602,6 +718,29 @@ export class WorkOrderScheduleComponent implements OnInit {
     return new Date(year, month - 1, day);
   }
 
+  private getPanelFocusableElements(): HTMLElement[] {
+    const panel = this.slidePanel?.nativeElement;
+    if (!panel) {
+      return [];
+    }
+
+    const selector =
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    return Array.from(panel.querySelectorAll<HTMLElement>(selector)).filter(
+      (element) => element.offsetParent !== null
+    );
+  }
+
+  private closeAllDatePickers(): void {
+    if (this.startDatePicker?.isOpen()) {
+      this.startDatePicker.close();
+    }
+    if (this.endDatePicker?.isOpen()) {
+      this.endDatePicker.close();
+    }
+    this.activeDatepicker = null;
+  }
+
   private getMarkerDate(): Date {
     const today = this.startOfDay(new Date());
     if (today >= this.visibleStartDate && today < this.visibleEndDate) {
@@ -616,13 +755,7 @@ export class WorkOrderScheduleComponent implements OnInit {
   }
 
   private getSampleWorkCenters(): WorkCenterDocument[] {
-    return [
-      { docId: 'wc1', docType: 'workCenter', data: { name: 'Genesis Hardware' } },
-      { docId: 'wc2', docType: 'workCenter', data: { name: 'Rodriques Electrics' } },
-      { docId: 'wc3', docType: 'workCenter', data: { name: 'Konsulting Inc' } },
-      { docId: 'wc4', docType: 'workCenter', data: { name: 'McMarrow Distribution' } },
-      { docId: 'wc5', docType: 'workCenter', data: { name: 'Spartan Manufacturing' } }
-    ];
+    return [...SAMPLE_WORK_CENTERS];
   }
 
   private getSampleWorkOrders(): WorkOrderDocument[] {
@@ -633,178 +766,17 @@ export class WorkOrderScheduleComponent implements OnInit {
       return this.toIsoDate(date);
     };
 
-    return [
-      // Work Center 1 (wc1)
-      {
-        docId: 'wo1',
-        docType: 'workOrder',
-        data: {
-          name: 'Batch 24-001',
-          workCenterId: 'wc1',
-          status: 'complete',
-          startDate: d(-2, 4),
-          endDate: d(-2, 18)
-        }
-      },
-      {
-        docId: 'wo2',
-        docType: 'workOrder',
-        data: {
-          name: 'Die Setup A',
-          workCenterId: 'wc1',
-          status: 'in-progress',
-          startDate: d(0, 5),
-          endDate: d(0, 16)
-        }
-      },
-      {
-        docId: 'wo13',
-        docType: 'workOrder',
-        data: {
-          name: 'Final Packaging Y',
-          workCenterId: 'wc1',
-          status: 'open',
-          startDate: d(2, 7),
-          endDate: d(2, 21)
-        }
-      },
-      // Work Center 2 (wc2)
-      {
-        docId: 'wo3',
-        docType: 'workOrder',
-        data: {
-          name: 'CNC Job #145',
-          workCenterId: 'wc2',
-          status: 'in-progress',
-          startDate: d(-1, 10),
-          endDate: d(-1, 24)
-        }
-      },
-      {
-        docId: 'wo4',
-        docType: 'workOrder',
-        data: {
-          name: 'Fixture Rework',
-          workCenterId: 'wc2',
-          status: 'open',
-          startDate: d(1, 3),
-          endDate: d(1, 15)
-        }
-      },
-      {
-        docId: 'wo14',
-        docType: 'workOrder',
-        data: {
-          name: 'Advanced Machining',
-          workCenterId: 'wc2',
-          status: 'complete',
-          startDate: d(3, 9),
-          endDate: d(3, 23)
-        }
-      },
-      // Work Center 3 (wc3)
-      {
-        docId: 'wo5',
-        docType: 'workOrder',
-        data: {
-          name: 'Assembly Pack B',
-          workCenterId: 'wc3',
-          status: 'in-progress',
-          startDate: d(-3, 12),
-          endDate: d(-3, 27)
-        }
-      },
-      {
-        docId: 'wo9',
-        docType: 'workOrder',
-        data: {
-          name: 'Spring Assembly',
-          workCenterId: 'wc3',
-          status: 'blocked',
-          startDate: d(0, 19),
-          endDate: d(1, 4)
-        }
-      },
-      {
-        docId: 'wo15',
-        docType: 'workOrder',
-        data: {
-          name: 'Complex Systems',
-          workCenterId: 'wc3',
-          status: 'open',
-          startDate: d(4, 6),
-          endDate: d(4, 20)
-        }
-      },
-      // Work Center 4 (wc4)
-      {
-        docId: 'wo6',
-        docType: 'workOrder',
-        data: {
-          name: 'QC Hold 001',
-          workCenterId: 'wc4',
-          status: 'blocked',
-          startDate: d(-2, 20),
-          endDate: d(-1, 7)
-        }
-      },
-      {
-        docId: 'wo11',
-        docType: 'workOrder',
-        data: {
-          name: 'Tooling Setup',
-          workCenterId: 'wc4',
-          status: 'open',
-          startDate: d(4, 2),
-          endDate: d(4, 18)
-        }
-      },
-      {
-        docId: 'wo16',
-        docType: 'workOrder',
-        data: {
-          name: 'Final Inspection',
-          workCenterId: 'wc4',
-          status: 'in-progress',
-          startDate: d(5, 5),
-          endDate: d(5, 18)
-        }
-      },
-      // Work Center 5 (wc5)
-      {
-        docId: 'wo7',
-        docType: 'workOrder',
-        data: {
-          name: 'Final Packaging X',
-          workCenterId: 'wc5',
-          status: 'open',
-          startDate: d(-1, 4),
-          endDate: d(-1, 18)
-        }
-      },
-      {
-        docId: 'wo12',
-        docType: 'workOrder',
-        data: {
-          name: 'Quality Control Pass',
-          workCenterId: 'wc5',
-          status: 'complete',
-          startDate: d(1, 20),
-          endDate: d(2, 6)
-        }
-      },
-      {
-        docId: 'wo17',
-        docType: 'workOrder',
-        data: {
-          name: 'Packaging Transfer',
-          workCenterId: 'wc5',
-          status: 'blocked',
-          startDate: d(4, 11),
-          endDate: d(4, 25)
-        }
+    return SAMPLE_WORK_ORDER_SEEDS.map((seed) => ({
+      docId: seed.docId,
+      docType: 'workOrder',
+      data: {
+        name: seed.name,
+        workCenterId: seed.workCenterId,
+        status: seed.status,
+        startDate: d(seed.start.monthOffset, seed.start.dayOfMonth),
+        endDate: d(seed.end.monthOffset, seed.end.dayOfMonth)
       }
-    ];
+    }));
   }
 }
 

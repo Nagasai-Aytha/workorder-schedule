@@ -124,7 +124,7 @@
 
 <div class="panel-overlay" *ngIf="isPanelOpen" (click)="closePanel()"></div>
 
-<aside class="slide-panel" [class.open]="isPanelOpen">
+<aside class="slide-panel" [class.open]="isPanelOpen" #slidePanel tabindex="0">
   <div class="panel-header">
     <div class="panel-title-wrap">
       <h2>Work Order Details</h2>
@@ -174,10 +174,16 @@
       <div class="date-input-wrap">
         <input
           id="end-date"
-          class="form-control date-field"
-          type="date"
+          class="form-control date-field date-picker-input"
+          type="text"
           formControlName="endDate"
-          (click)="openNativeDatePicker($event)"
+          ngbDatepicker
+          #endDatePicker="ngbDatepicker"
+          placement="top-start bottom-start"
+          container="body"
+          autoClose="true"
+          (click)="openDatePicker(endDatePicker, $event)"
+          (dateSelect)="closeDatePicker(endDatePicker)"
         />
       </div>
       <div
@@ -193,10 +199,16 @@
       <div class="date-input-wrap">
         <input
           id="start-date"
-          class="form-control date-field"
-          type="date"
+          class="form-control date-field date-picker-input"
+          type="text"
           formControlName="startDate"
-          (click)="openNativeDatePicker($event)"
+          ngbDatepicker
+          #startDatePicker="ngbDatepicker"
+          placement="bottom-start top-start"
+          container="body"
+          autoClose="true"
+          (click)="openDatePicker(startDatePicker, $event)"
+          (dateSelect)="closeDatePicker(startDatePicker)"
         />
       </div>
       <div class="error-message" *ngIf="workOrderForm.controls.startDate.touched && workOrderForm.controls.startDate.invalid">
