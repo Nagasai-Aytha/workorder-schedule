@@ -2,6 +2,17 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { WorkOrderDocument, WorkOrderScheduleComponent } from './work-order-schedule';
 
+if (!(globalThis as any).$localize) {
+  (globalThis as any).$localize = (
+    messageParts: TemplateStringsArray,
+    ...expressions: unknown[]
+  ): string =>
+    messageParts.reduce(
+      (result, part, index) => result + part + (index < expressions.length ? String(expressions[index]) : ''),
+      ''
+    );
+}
+
 describe('WorkOrderScheduleComponent', () => {
   let component: WorkOrderScheduleComponent;
   let fixture: ComponentFixture<WorkOrderScheduleComponent>;
@@ -48,24 +59,31 @@ describe('WorkOrderScheduleComponent', () => {
     expect(component.isTimescaleOpen).toBe(false);
   });
 
-  it('should open native date picker safely', () => {
+  it('should open ngb date picker safely', () => {
     const stopPropagation = vi.fn();
-    const focus = vi.fn();
-    const showPicker = vi.fn();
-    const input = { focus, showPicker } as unknown as HTMLInputElement;
-    const event = { stopPropagation, currentTarget: input } as unknown as MouseEvent;
+    const datepicker = {
+      isOpen: () => false,
+      open: vi.fn(),
+      close: vi.fn()
+    } as any;
+    const event = { stopPropagation } as unknown as MouseEvent;
 
-    component.openNativeDatePicker(event);
+    component.openDatePicker(datepicker, event);
     expect(stopPropagation).toHaveBeenCalled();
-    expect(focus).toHaveBeenCalled();
-    expect(showPicker).toHaveBeenCalled();
+    expect(datepicker.open).toHaveBeenCalled();
   });
 
-  it('should not throw when date picker input target is missing', () => {
-    const stopPropagation = vi.fn();
-    const event = { stopPropagation, currentTarget: null } as unknown as MouseEvent;
-    component.openNativeDatePicker(event);
-    expect(stopPropagation).toHaveBeenCalled();
+  it('should close ngb date picker and clear active reference', () => {
+    const datepicker = {
+      isOpen: () => true,
+      open: vi.fn(),
+      close: vi.fn()
+    } as any;
+    (component as any).activeDatepicker = datepicker;
+
+    component.closeDatePicker(datepicker);
+    expect(datepicker.close).toHaveBeenCalled();
+    expect((component as any).activeDatepicker).toBeNull();
   });
 
   it('should toggle and select timescale', () => {
@@ -350,8 +368,8 @@ describe('WorkOrderScheduleComponent', () => {
     expect(bar?.style.width).toMatch(/px/);
   });
 
-  it('should call openNativeDatePicker when start date input is clicked', () => {
-    const pickerSpy = vi.spyOn(component, 'openNativeDatePicker');
+  it('should call openDatePicker when start date input is clicked', () => {
+    const pickerSpy = vi.spyOn(component, 'openDatePicker');
     fixture.detectChanges();
     const startDateInput = fixture.nativeElement.querySelector('#start-date') as HTMLInputElement;
     startDateInput.click();
