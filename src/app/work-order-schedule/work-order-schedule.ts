@@ -225,13 +225,13 @@ export class WorkOrderScheduleComponent implements OnInit {
   onDocumentClick(event: MouseEvent): void {
     this.openMenuOrderId = null;
     this.isTimescaleOpen = false;
-  }
 
-  @HostListener('document:pointerdown', ['$event'])
-  onDocumentPointerDown(event: PointerEvent): void {
     const target = event.target as HTMLElement | null;
     const clickedInsideDatepicker =
-      !!target?.closest('.ngb-dp') || !!target?.closest('.date-picker-input');
+      !!target?.closest('.ngb-dp') ||
+      !!target?.closest('.ngb-datepicker') ||
+      !!target?.closest('.ngb-dp-container') ||
+      !!target?.closest('.date-picker-input');
     if (!clickedInsideDatepicker) {
       this.closeAllDatePickers();
     }
