@@ -51616,10 +51616,8 @@ var WorkOrderScheduleComponent = class _WorkOrderScheduleComponent {
   onDocumentClick(event) {
     this.openMenuOrderId = null;
     this.isTimescaleOpen = false;
-  }
-  onDocumentPointerDown(event) {
     const target = event.target;
-    const clickedInsideDatepicker = !!target?.closest(".ngb-dp") || !!target?.closest(".date-picker-input");
+    const clickedInsideDatepicker = !!target?.closest(".ngb-dp") || !!target?.closest(".ngb-datepicker") || !!target?.closest(".ngb-dp-container") || !!target?.closest(".date-picker-input");
     if (!clickedInsideDatepicker) {
       this.closeAllDatePickers();
     }
@@ -52086,8 +52084,6 @@ var WorkOrderScheduleComponent = class _WorkOrderScheduleComponent {
         return ctx.onDocumentKeydown($event);
       }, \u0275\u0275resolveDocument)("click", function WorkOrderScheduleComponent_click_HostBindingHandler($event) {
         return ctx.onDocumentClick($event);
-      }, \u0275\u0275resolveDocument)("pointerdown", function WorkOrderScheduleComponent_pointerdown_HostBindingHandler($event) {
-        return ctx.onDocumentPointerDown($event);
       }, \u0275\u0275resolveDocument);
     }
   }, features: [\u0275\u0275ProvidersFeature([
@@ -52187,7 +52183,8 @@ var WorkOrderScheduleComponent = class _WorkOrderScheduleComponent {
         return \u0275\u0275resetView(ctx.openDatePicker(endDatePicker_r14, $event));
       })("dateSelect", function WorkOrderScheduleComponent_Template_input_dateSelect_61_listener() {
         \u0275\u0275restoreView(_r1);
-        return \u0275\u0275resetView(ctx.closeAllDatePickersFromUi());
+        const endDatePicker_r14 = \u0275\u0275reference(62);
+        return \u0275\u0275resetView(ctx.closeDatePicker(endDatePicker_r14));
       });
       \u0275\u0275elementEnd()();
       \u0275\u0275template(63, WorkOrderScheduleComponent_div_63_Template, 2, 0, "div", 42);
@@ -52202,7 +52199,8 @@ var WorkOrderScheduleComponent = class _WorkOrderScheduleComponent {
         return \u0275\u0275resetView(ctx.openDatePicker(startDatePicker_r15, $event));
       })("dateSelect", function WorkOrderScheduleComponent_Template_input_dateSelect_68_listener() {
         \u0275\u0275restoreView(_r1);
-        return \u0275\u0275resetView(ctx.closeAllDatePickersFromUi());
+        const startDatePicker_r15 = \u0275\u0275reference(69);
+        return \u0275\u0275resetView(ctx.closeDatePicker(startDatePicker_r15));
       });
       \u0275\u0275elementEnd()();
       \u0275\u0275template(70, WorkOrderScheduleComponent_div_70_Template, 2, 0, "div", 42);
@@ -53037,227 +53035,227 @@ var WorkOrderScheduleComponent = class _WorkOrderScheduleComponent {
     args: [{ selector: "app-work-order-schedule", standalone: true, imports: [CommonModule, ReactiveFormsModule, FormsModule, NgSelectModule, NgbDatepickerModule], providers: [
       { provide: NgbDateAdapter, useClass: IsoDateAdapter },
       { provide: NgbDateParserFormatter, useClass: IsoDateParserFormatter }
-    ], template: `<div class="work-order-timeline">
-  <header class="timeline-header">
-<img src="assets/images/naologic.png" alt="NAOLOGIC" class="logo" />
-    <h1 class="title">Work Orders</h1>
-  </header>
-
-  <div class="timescale-controls" [class.open]="isTimescaleOpen" (click)="$event.stopPropagation()">
-    <div class="timescale-pill">
-      <span class="timescale-static">Timescale</span>
-      <button
-        type="button"
-        class="timescale-trigger"
-        (click)="toggleTimescaleMenu($event)"
-        [attr.aria-expanded]="isTimescaleOpen"
-        aria-haspopup="listbox"
-        aria-label="Select timescale"
-      >
-        <span>{{ getTimescaleLabel(timescaleMode) }}</span>
-        <span class="timescale-chevron" aria-hidden="true"></span>
-      </button>
-    </div>
-
-    <div class="timescale-menu" *ngIf="isTimescaleOpen" role="listbox" aria-label="Timescale options">
-      <button
-        type="button"
-        class="timescale-option"
-        *ngFor="let option of timescaleOptions"
-        [class.active]="option.value === timescaleMode"
-        (click)="selectTimescale(option.value, $event)"
-      >
-        {{ option.label }}
-      </button>
-    </div>
-  </div>
-
-  <div class="timeline-container">
-    <aside class="work-centers-sidebar">
-      <div class="sidebar-header">Work Center</div>
-      <div
-        class="work-center-row"
-        *ngFor="let center of workCenters; trackBy: trackById"
-        [style.height.px]="getRowHeight(center.docId)"
-      >
-        <span class="center-name">{{ center.data.name }}</span>
-      </div>
-    </aside>
-
-    <section class="timeline-grid-wrapper" #timelineScroller>
-      <div class="timeline-scroll" [style.width.px]="totalTimelineWidthPx">
-        <div class="timeline-header-row" [attr.data-mode]="timescaleMode">
-          <div
-            class="time-segment"
-            [class.current-segment]="segment.isCurrent"
-            *ngFor="let segment of headerSegments"
-            [style.width.px]="segment.width"
-          >
-            {{ segment.label }}
-            <span class="current-month-tag" *ngIf="segment.isCurrent">Current month</span>
-          </div>
-        </div>
-
-        <div class="timeline-grid" #timelineGrid>
-          <div class="current-day-indicator" [style.left.px]="currentDayOffsetPx"></div>
-
-          <div class="day-columns">
-            <div class="day-column" *ngFor="let day of timelineDays"></div>
-          </div>
-
-          <div class="month-separators">
-            <div 
-              class="month-separator" 
-              *ngFor="let separator of monthSeparators"
-              [style.left.px]="separator.left"
-            ></div>
-          </div>
-
-          <div class="work-order-rows">
-            <div
-              class="work-order-row"
-              *ngFor="let center of workCenters; trackBy: trackById"
-              [style.height.px]="getRowHeight(center.docId)"
-              (click)="onTimelineClick(center.docId, $event)"
-            >
-              <div
-                class="work-order-bar"
-                *ngFor="let layout of getVisualWorkOrdersForCenter(center.docId); trackBy: trackByLayout"
-                [style.left.px]="layout.leftPx"
-                [style.width.px]="layout.widthPx"
-                [style.top.px]="getBarTopPx(layout.lane)"
-                [ngClass]="getStatusClass(layout.order.data.status)"
-                (click)="$event.stopPropagation()"
-                [title]="layout.order.data.name"
-              >
-                <div class="bar-content">
-                  <span class="order-name">{{ layout.order.data.name }}</span>
-                  <span
-                    class="status-badge"
-                    [ngClass]="getStatusClass(layout.order.data.status)"
-                    *ngIf="showStatusBadge(layout.widthPx)"
-                  >
-                    {{ getStatusLabel(layout.order.data.status) }}
-                  </span>
-                </div>
-
-                <div class="three-dot-menu">
-                  <button class="menu-trigger" (click)="toggleOrderMenu(layout.order.docId, $event)" aria-label="Actions">
-                    <span class="dot"></span>
-                    <span class="dot"></span>
-                    <span class="dot"></span>
-                  </button>
-                  <div class="menu-dropdown" *ngIf="isMenuOpen(layout.order.docId)">
-                    <button type="button" (click)="openEditPanel(layout.order, $event)">Edit</button>
-                    <button type="button" class="delete-btn" (click)="deleteWorkOrder(layout.order, $event)">Delete</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  </div>
-</div>
-
-<div class="panel-overlay" *ngIf="isPanelOpen" (click)="closePanel()"></div>
-
-<aside class="slide-panel" [class.open]="isPanelOpen" #slidePanel tabindex="0">
-  <div class="panel-header">
-    <div class="panel-title-wrap">
-      <h2>Work Order Details</h2>
-      <p>Specify the dates, name and status for this order</p>
-    </div>
-    <div class="panel-top-actions">
-      <button type="button" class="action-btn action-btn-secondary" (click)="closePanel()">Cancel</button>
-      <button type="button" class="action-btn action-btn-primary" (click)="onSubmit()">
-        {{ panelMode === 'create' ? 'Create' : 'Save' }}
-      </button>
-    </div>
-  </div>
-
-  <form [formGroup]="workOrderForm" (ngSubmit)="onSubmit()" class="panel-form">
-    <div class="form-group">
-      <label for="order-name">Work Order Name</label>
-      <input id="order-name" type="text" class="form-control" formControlName="name" />
-      <div class="error-message" *ngIf="workOrderForm.controls.name.touched && workOrderForm.controls.name.invalid">
-        Work order name is required.
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label for="order-status-input">Status</label>
-      <ng-select
-        id="order-status"
-        labelForId="order-status-input"
-        name="status"
-        [ngClass]="{
-          'status-select-open': workOrderForm.controls.status.value === 'open',
-          'status-select-in-progress': workOrderForm.controls.status.value === 'in-progress',
-          'status-select-complete': workOrderForm.controls.status.value === 'complete',
-          'status-select-blocked': workOrderForm.controls.status.value === 'blocked'
-        }"
-        [inputAttrs]="{ name: 'order-status' }"
-        formControlName="status"
-        [items]="statusOptions"
-        bindLabel="label"
-        bindValue="value"
-        [clearable]="false"
-        [searchable]="false"
-      ></ng-select>
-    </div>
-
-    <div class="form-group">
-      <label for="end-date">End date</label>
-      <div class="date-input-wrap">
-        <input
-          id="end-date"
-          class="form-control date-field date-picker-input"
-          type="text"
-          formControlName="endDate"
-          ngbDatepicker
-          #endDatePicker="ngbDatepicker"
-          placement="top-start bottom-start"
+    ], template: `<div class="work-order-timeline">\r
+  <header class="timeline-header">\r
+<img src="assets/images/naologic.png" alt="NAOLOGIC" class="logo" />\r
+    <h1 class="title">Work Orders</h1>\r
+  </header>\r
+\r
+  <div class="timescale-controls" [class.open]="isTimescaleOpen" (click)="$event.stopPropagation()">\r
+    <div class="timescale-pill">\r
+      <span class="timescale-static">Timescale</span>\r
+      <button\r
+        type="button"\r
+        class="timescale-trigger"\r
+        (click)="toggleTimescaleMenu($event)"\r
+        [attr.aria-expanded]="isTimescaleOpen"\r
+        aria-haspopup="listbox"\r
+        aria-label="Select timescale"\r
+      >\r
+        <span>{{ getTimescaleLabel(timescaleMode) }}</span>\r
+        <span class="timescale-chevron" aria-hidden="true"></span>\r
+      </button>\r
+    </div>\r
+\r
+    <div class="timescale-menu" *ngIf="isTimescaleOpen" role="listbox" aria-label="Timescale options">\r
+      <button\r
+        type="button"\r
+        class="timescale-option"\r
+        *ngFor="let option of timescaleOptions"\r
+        [class.active]="option.value === timescaleMode"\r
+        (click)="selectTimescale(option.value, $event)"\r
+      >\r
+        {{ option.label }}\r
+      </button>\r
+    </div>\r
+  </div>\r
+\r
+  <div class="timeline-container">\r
+    <aside class="work-centers-sidebar">\r
+      <div class="sidebar-header">Work Center</div>\r
+      <div\r
+        class="work-center-row"\r
+        *ngFor="let center of workCenters; trackBy: trackById"\r
+        [style.height.px]="getRowHeight(center.docId)"\r
+      >\r
+        <span class="center-name">{{ center.data.name }}</span>\r
+      </div>\r
+    </aside>\r
+\r
+    <section class="timeline-grid-wrapper" #timelineScroller>\r
+      <div class="timeline-scroll" [style.width.px]="totalTimelineWidthPx">\r
+        <div class="timeline-header-row" [attr.data-mode]="timescaleMode">\r
+          <div\r
+            class="time-segment"\r
+            [class.current-segment]="segment.isCurrent"\r
+            *ngFor="let segment of headerSegments"\r
+            [style.width.px]="segment.width"\r
+          >\r
+            {{ segment.label }}\r
+            <span class="current-month-tag" *ngIf="segment.isCurrent">Current month</span>\r
+          </div>\r
+        </div>\r
+\r
+        <div class="timeline-grid" #timelineGrid>\r
+          <div class="current-day-indicator" [style.left.px]="currentDayOffsetPx"></div>\r
+\r
+          <div class="day-columns">\r
+            <div class="day-column" *ngFor="let day of timelineDays"></div>\r
+          </div>\r
+\r
+          <div class="month-separators">\r
+            <div \r
+              class="month-separator" \r
+              *ngFor="let separator of monthSeparators"\r
+              [style.left.px]="separator.left"\r
+            ></div>\r
+          </div>\r
+\r
+          <div class="work-order-rows">\r
+            <div\r
+              class="work-order-row"\r
+              *ngFor="let center of workCenters; trackBy: trackById"\r
+              [style.height.px]="getRowHeight(center.docId)"\r
+              (click)="onTimelineClick(center.docId, $event)"\r
+            >\r
+              <div\r
+                class="work-order-bar"\r
+                *ngFor="let layout of getVisualWorkOrdersForCenter(center.docId); trackBy: trackByLayout"\r
+                [style.left.px]="layout.leftPx"\r
+                [style.width.px]="layout.widthPx"\r
+                [style.top.px]="getBarTopPx(layout.lane)"\r
+                [ngClass]="getStatusClass(layout.order.data.status)"\r
+                (click)="$event.stopPropagation()"\r
+                [title]="layout.order.data.name"\r
+              >\r
+                <div class="bar-content">\r
+                  <span class="order-name">{{ layout.order.data.name }}</span>\r
+                  <span\r
+                    class="status-badge"\r
+                    [ngClass]="getStatusClass(layout.order.data.status)"\r
+                    *ngIf="showStatusBadge(layout.widthPx)"\r
+                  >\r
+                    {{ getStatusLabel(layout.order.data.status) }}\r
+                  </span>\r
+                </div>\r
+\r
+                <div class="three-dot-menu">\r
+                  <button class="menu-trigger" (click)="toggleOrderMenu(layout.order.docId, $event)" aria-label="Actions">\r
+                    <span class="dot"></span>\r
+                    <span class="dot"></span>\r
+                    <span class="dot"></span>\r
+                  </button>\r
+                  <div class="menu-dropdown" *ngIf="isMenuOpen(layout.order.docId)">\r
+                    <button type="button" (click)="openEditPanel(layout.order, $event)">Edit</button>\r
+                    <button type="button" class="delete-btn" (click)="deleteWorkOrder(layout.order, $event)">Delete</button>\r
+                  </div>\r
+                </div>\r
+              </div>\r
+            </div>\r
+          </div>\r
+        </div>\r
+      </div>\r
+    </section>\r
+  </div>\r
+</div>\r
+\r
+<div class="panel-overlay" *ngIf="isPanelOpen" (click)="closePanel()"></div>\r
+\r
+<aside class="slide-panel" [class.open]="isPanelOpen" #slidePanel tabindex="0">\r
+  <div class="panel-header">\r
+    <div class="panel-title-wrap">\r
+      <h2>Work Order Details</h2>\r
+      <p>Specify the dates, name and status for this order</p>\r
+    </div>\r
+    <div class="panel-top-actions">\r
+      <button type="button" class="action-btn action-btn-secondary" (click)="closePanel()">Cancel</button>\r
+      <button type="button" class="action-btn action-btn-primary" (click)="onSubmit()">\r
+        {{ panelMode === 'create' ? 'Create' : 'Save' }}\r
+      </button>\r
+    </div>\r
+  </div>\r
+\r
+  <form [formGroup]="workOrderForm" (ngSubmit)="onSubmit()" class="panel-form">\r
+    <div class="form-group">\r
+      <label for="order-name">Work Order Name</label>\r
+      <input id="order-name" type="text" class="form-control" formControlName="name" />\r
+      <div class="error-message" *ngIf="workOrderForm.controls.name.touched && workOrderForm.controls.name.invalid">\r
+        Work order name is required.\r
+      </div>\r
+    </div>\r
+\r
+    <div class="form-group">\r
+      <label for="order-status-input">Status</label>\r
+      <ng-select\r
+        id="order-status"\r
+        labelForId="order-status-input"\r
+        name="status"\r
+        [ngClass]="{\r
+          'status-select-open': workOrderForm.controls.status.value === 'open',\r
+          'status-select-in-progress': workOrderForm.controls.status.value === 'in-progress',\r
+          'status-select-complete': workOrderForm.controls.status.value === 'complete',\r
+          'status-select-blocked': workOrderForm.controls.status.value === 'blocked'\r
+        }"\r
+        [inputAttrs]="{ name: 'order-status' }"\r
+        formControlName="status"\r
+        [items]="statusOptions"\r
+        bindLabel="label"\r
+        bindValue="value"\r
+        [clearable]="false"\r
+        [searchable]="false"\r
+      ></ng-select>\r
+    </div>\r
+\r
+    <div class="form-group">\r
+      <label for="end-date">End date</label>\r
+      <div class="date-input-wrap">\r
+        <input\r
+          id="end-date"\r
+          class="form-control date-field date-picker-input"\r
+          type="text"\r
+          formControlName="endDate"\r
+          ngbDatepicker\r
+          #endDatePicker="ngbDatepicker"\r
+          placement="top-start bottom-start"\r
           container="body"
           autoClose="true"
           (click)="openDatePicker(endDatePicker, $event)"
-          (dateSelect)="closeAllDatePickersFromUi()"
+          (dateSelect)="closeDatePicker(endDatePicker)"
         />
-      </div>
-      <div
-        class="error-message"
-        *ngIf="workOrderForm.controls.endDate.touched && workOrderForm.controls.endDate.invalid"
-      >
-        End date is required.
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label for="start-date">Start date</label>
-      <div class="date-input-wrap">
-        <input
-          id="start-date"
-          class="form-control date-field date-picker-input"
-          type="text"
-          formControlName="startDate"
-          ngbDatepicker
-          #startDatePicker="ngbDatepicker"
-          placement="bottom-start top-start"
+      </div>\r
+      <div\r
+        class="error-message"\r
+        *ngIf="workOrderForm.controls.endDate.touched && workOrderForm.controls.endDate.invalid"\r
+      >\r
+        End date is required.\r
+      </div>\r
+    </div>\r
+\r
+    <div class="form-group">\r
+      <label for="start-date">Start date</label>\r
+      <div class="date-input-wrap">\r
+        <input\r
+          id="start-date"\r
+          class="form-control date-field date-picker-input"\r
+          type="text"\r
+          formControlName="startDate"\r
+          ngbDatepicker\r
+          #startDatePicker="ngbDatepicker"\r
+          placement="bottom-start top-start"\r
           container="body"
           autoClose="true"
           (click)="openDatePicker(startDatePicker, $event)"
-          (dateSelect)="closeAllDatePickersFromUi()"
+          (dateSelect)="closeDatePicker(startDatePicker)"
         />
-      </div>
-      <div class="error-message" *ngIf="workOrderForm.controls.startDate.touched && workOrderForm.controls.startDate.invalid">
-        Start date is required.
-      </div>
-    </div>
-
-    <div class="error-message overlap-error" *ngIf="overlapError">{{ overlapError }}</div>
-  </form>
-</aside>
+      </div>\r
+      <div class="error-message" *ngIf="workOrderForm.controls.startDate.touched && workOrderForm.controls.startDate.invalid">\r
+        Start date is required.\r
+      </div>\r
+    </div>\r
+\r
+    <div class="error-message overlap-error" *ngIf="overlapError">{{ overlapError }}</div>\r
+  </form>\r
+</aside>\r
 `, styles: [`@import "https://naologic-com-assets.naologic.com/fonts/circular-std/circular-std.css";
 
 /* src/app/work-order-schedule/work-order-schedule.scss */
@@ -54058,9 +54056,6 @@ var WorkOrderScheduleComponent = class _WorkOrderScheduleComponent {
   }], onDocumentClick: [{
     type: HostListener,
     args: ["document:click", ["$event"]]
-  }], onDocumentPointerDown: [{
-    type: HostListener,
-    args: ["document:pointerdown", ["$event"]]
   }] });
 })();
 (() => {
