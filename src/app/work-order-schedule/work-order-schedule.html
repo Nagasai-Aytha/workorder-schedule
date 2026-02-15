@@ -183,7 +183,7 @@
           container="body"
           autoClose="true"
           (click)="openDatePicker(endDatePicker, $event)"
-          (dateSelect)="closeDatePicker(endDatePicker)"
+          (dateSelect)="closeAllDatePickersFromUi()"
         />
       </div>
       <div
@@ -208,7 +208,7 @@
           container="body"
           autoClose="true"
           (click)="openDatePicker(startDatePicker, $event)"
-          (dateSelect)="closeDatePicker(startDatePicker)"
+          (dateSelect)="closeAllDatePickersFromUi()"
         />
       </div>
       <div class="error-message" *ngIf="workOrderForm.controls.startDate.touched && workOrderForm.controls.startDate.invalid">

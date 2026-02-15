@@ -239,10 +239,9 @@ export class WorkOrderScheduleComponent implements OnInit {
 
   openDatePicker(datepicker: NgbInputDatepicker, event?: Event): void {
     event?.stopPropagation();
-    if (this.activeDatepicker && this.activeDatepicker !== datepicker) {
-      this.activeDatepicker.close();
-    }
-    if (!datepicker.isOpen()) {
+    const shouldReopen = !datepicker.isOpen();
+    this.closeAllDatePickers();
+    if (shouldReopen) {
       datepicker.open();
     }
     this.activeDatepicker = datepicker;
@@ -255,6 +254,10 @@ export class WorkOrderScheduleComponent implements OnInit {
     if (this.activeDatepicker === datepicker) {
       this.activeDatepicker = null;
     }
+  }
+
+  closeAllDatePickersFromUi(): void {
+    this.closeAllDatePickers();
   }
 
   get totalTimelineWidthPx(): number {

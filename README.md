@@ -84,4 +84,4 @@ Open: `http://localhost:4200`
 ## Demo Video and Repository
 
 - Loom video: 
-- Public repository: 
+- Public repository: https://github.com/Nagasai-Aytha/workorder-schedule
