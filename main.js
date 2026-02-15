@@ -51626,10 +51626,9 @@ var WorkOrderScheduleComponent = class _WorkOrderScheduleComponent {
   }
   openDatePicker(datepicker, event) {
     event?.stopPropagation();
-    if (this.activeDatepicker && this.activeDatepicker !== datepicker) {
-      this.activeDatepicker.close();
-    }
-    if (!datepicker.isOpen()) {
+    const shouldReopen = !datepicker.isOpen();
+    this.closeAllDatePickers();
+    if (shouldReopen) {
       datepicker.open();
     }
     this.activeDatepicker = datepicker;
@@ -51641,6 +51640,9 @@ var WorkOrderScheduleComponent = class _WorkOrderScheduleComponent {
     if (this.activeDatepicker === datepicker) {
       this.activeDatepicker = null;
     }
+  }
+  closeAllDatePickersFromUi() {
+    this.closeAllDatePickers();
   }
   get totalTimelineWidthPx() {
     return this.getDateDiffInDays(this.visibleStartDate, this.visibleEndDate) * this.pxPerDay;
@@ -52185,8 +52187,7 @@ var WorkOrderScheduleComponent = class _WorkOrderScheduleComponent {
         return \u0275\u0275resetView(ctx.openDatePicker(endDatePicker_r14, $event));
       })("dateSelect", function WorkOrderScheduleComponent_Template_input_dateSelect_61_listener() {
         \u0275\u0275restoreView(_r1);
-        const endDatePicker_r14 = \u0275\u0275reference(62);
-        return \u0275\u0275resetView(ctx.closeDatePicker(endDatePicker_r14));
+        return \u0275\u0275resetView(ctx.closeAllDatePickersFromUi());
       });
       \u0275\u0275elementEnd()();
       \u0275\u0275template(63, WorkOrderScheduleComponent_div_63_Template, 2, 0, "div", 42);
@@ -52201,8 +52202,7 @@ var WorkOrderScheduleComponent = class _WorkOrderScheduleComponent {
         return \u0275\u0275resetView(ctx.openDatePicker(startDatePicker_r15, $event));
       })("dateSelect", function WorkOrderScheduleComponent_Template_input_dateSelect_68_listener() {
         \u0275\u0275restoreView(_r1);
-        const startDatePicker_r15 = \u0275\u0275reference(69);
-        return \u0275\u0275resetView(ctx.closeDatePicker(startDatePicker_r15));
+        return \u0275\u0275resetView(ctx.closeAllDatePickersFromUi());
       });
       \u0275\u0275elementEnd()();
       \u0275\u0275template(70, WorkOrderScheduleComponent_div_70_Template, 2, 0, "div", 42);
@@ -53222,7 +53222,7 @@ var WorkOrderScheduleComponent = class _WorkOrderScheduleComponent {
           container="body"
           autoClose="true"
           (click)="openDatePicker(endDatePicker, $event)"
-          (dateSelect)="closeDatePicker(endDatePicker)"
+          (dateSelect)="closeAllDatePickersFromUi()"
         />
       </div>
       <div
@@ -53247,7 +53247,7 @@ var WorkOrderScheduleComponent = class _WorkOrderScheduleComponent {
           container="body"
           autoClose="true"
           (click)="openDatePicker(startDatePicker, $event)"
-          (dateSelect)="closeDatePicker(startDatePicker)"
+          (dateSelect)="closeAllDatePickersFromUi()"
         />
       </div>
       <div class="error-message" *ngIf="workOrderForm.controls.startDate.touched && workOrderForm.controls.startDate.invalid">
